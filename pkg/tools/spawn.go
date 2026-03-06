@@ -9,6 +9,7 @@ import (
 type SpawnTool struct {
 	manager        *SubagentManager
 	allowlistCheck func(targetAgentID string) bool
+	resolveManager func(targetAgentID string) (*SubagentManager, bool)
 }
 
 // Compile-time check: SpawnTool implements AsyncExecutor.
@@ -53,6 +54,12 @@ func (t *SpawnTool) SetAllowlistChecker(check func(targetAgentID string) bool) {
 	t.allowlistCheck = check
 }
 
+// SetManagerResolver allows resolving the subagent manager by target agent ID.
+// When set, Execute/ExecuteAsync will use the resolved manager if agent_id is provided.
+func (t *SpawnTool) SetManagerResolver(resolver func(targetAgentID string) (*SubagentManager, bool)) {
+	t.resolveManager = resolver
+}
+
 func (t *SpawnTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
 	return t.execute(ctx, args, nil)
 }
@@ -79,7 +86,16 @@ func (t *SpawnTool) execute(ctx context.Context, args map[string]any, cb AsyncCa
 		}
 	}
 
-	if t.manager == nil {
+	manager := t.manager
+	if strings.TrimSpace(agentID) != "" && t.resolveManager != nil {
+		if resolved, ok := t.resolveManager(agentID); ok && resolved != nil {
+			manager = resolved
+		} else {
+			return ErrorResult(fmt.Sprintf("target agent '%s' is not available for spawning", agentID))
+		}
+	}
+
+	if manager == nil {
 		return ErrorResult("Subagent manager not configured")
 	}
 
@@ -96,7 +112,7 @@ func (t *SpawnTool) execute(ctx context.Context, args map[string]any, cb AsyncCa
 	}
 
 	// Pass callback to manager for async completion notification
-	result, err := t.manager.Spawn(ctx, task, label, agentID, channel, chatID, cb)
+	result, err := manager.Spawn(ctx, task, label, agentID, channel, chatID, cb)
 	if err != nil {
 		return ErrorResult(fmt.Sprintf("failed to spawn subagent: %v", err))
 	}

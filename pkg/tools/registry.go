@@ -22,6 +22,43 @@ func NewToolRegistry() *ToolRegistry {
 	}
 }
 
+// Clone returns a shallow copy of the registry.
+// Tool instances are shared (not deep-copied).
+func (r *ToolRegistry) Clone() *ToolRegistry {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	out := NewToolRegistry()
+	for name, tool := range r.tools {
+		out.tools[name] = tool
+	}
+	return out
+}
+
+// CloneExcept returns a shallow copy of the registry excluding the given tool names.
+// Tool instances are shared (not deep-copied).
+func (r *ToolRegistry) CloneExcept(excluded ...string) *ToolRegistry {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	exclude := make(map[string]struct{}, len(excluded))
+	for _, name := range excluded {
+		if name == "" {
+			continue
+		}
+		exclude[name] = struct{}{}
+	}
+
+	out := NewToolRegistry()
+	for name, tool := range r.tools {
+		if _, ok := exclude[name]; ok {
+			continue
+		}
+		out.tools[name] = tool
+	}
+	return out
+}
+
 func (r *ToolRegistry) Register(tool Tool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

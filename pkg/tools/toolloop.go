@@ -24,6 +24,9 @@ type ToolLoopConfig struct {
 	Tools         *ToolRegistry
 	MaxIterations int
 	LLMOptions    map[string]any
+	// OnMessage is invoked for each new message appended during the loop
+	// (assistant messages with tool calls, tool results, and the final assistant response).
+	OnMessage func(msg providers.Message)
 }
 
 // ToolLoopResult contains the result of running the tool loop.
@@ -77,6 +80,11 @@ func RunToolLoop(
 		// 4. If no tool calls, we're done
 		if len(response.ToolCalls) == 0 {
 			finalContent = response.Content
+			finalMsg := providers.Message{Role: "assistant", Content: response.Content}
+			messages = append(messages, finalMsg)
+			if config.OnMessage != nil {
+				config.OnMessage(finalMsg)
+			}
 			logger.InfoCF("toolloop", "LLM response without tool calls (direct answer)",
 				map[string]any{
 					"iteration":     iteration,
@@ -121,6 +129,9 @@ func RunToolLoop(
 			})
 		}
 		messages = append(messages, assistantMsg)
+		if config.OnMessage != nil {
+			config.OnMessage(assistantMsg)
+		}
 
 		// 7. Execute tool calls in parallel
 		type indexedResult struct {
@@ -164,11 +175,15 @@ func RunToolLoop(
 				contentForLLM = r.result.Err.Error()
 			}
 
-			messages = append(messages, providers.Message{
+			toolMsg := providers.Message{
 				Role:       "tool",
 				Content:    contentForLLM,
 				ToolCallID: r.tc.ID,
-			})
+			}
+			messages = append(messages, toolMsg)
+			if config.OnMessage != nil {
+				config.OnMessage(toolMsg)
+			}
 		}
 	}
 

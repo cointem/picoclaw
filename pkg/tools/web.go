@@ -852,6 +852,17 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
 
+	channel := ToolChannel(ctx)
+	// In chat channels, web_fetch is usually an internal step and its status
+	// messages are noisy. Keep the summary only for CLI callers.
+	if channel != "" && strings.ToLower(strings.TrimSpace(channel)) != "cli" {
+		return &ToolResult{
+			ForLLM:  string(resultJSON),
+			ForUser: "",
+			Silent:  true,
+		}
+	}
+
 	return &ToolResult{
 		ForLLM: string(resultJSON),
 		ForUser: fmt.Sprintf(

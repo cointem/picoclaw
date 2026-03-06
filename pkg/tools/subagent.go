@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -113,13 +114,16 @@ func (sm *SubagentManager) Spawn(
 }
 
 func (sm *SubagentManager) runTask(ctx context.Context, task *SubagentTask, callback AsyncCallback) {
+	sm.mu.Lock()
 	task.Status = "running"
 	task.Created = time.Now().UnixMilli()
+	sm.mu.Unlock()
 
 	// Build system prompt for subagent
 	systemPrompt := `You are a subagent. Complete the given task independently and report the result.
 You have access to tools - use them as needed to complete your task.
-After completing the task, provide a clear summary of what was done.`
+After completing the task, provide a clear summary of what was done.
+Respond in the same language as the user unless explicitly asked otherwise.`
 
 	messages := []providers.Message{
 		{
@@ -174,6 +178,10 @@ After completing the task, provide a clear summary of what was done.`
 
 	sm.mu.Lock()
 	var result *ToolResult
+	label := task.Label
+	if strings.TrimSpace(label) == "" {
+		label = task.ID
+	}
 	defer func() {
 		sm.mu.Unlock()
 		// Call callback if provided and result is set
@@ -204,7 +212,7 @@ After completing the task, provide a clear summary of what was done.`
 		result = &ToolResult{
 			ForLLM: fmt.Sprintf(
 				"Subagent '%s' completed (iterations: %d): %s",
-				task.Label,
+				label,
 				loopResult.Iterations,
 				loopResult.Content,
 			),
@@ -215,16 +223,20 @@ After completing the task, provide a clear summary of what was done.`
 		}
 	}
 
+	originChannel := task.OriginChannel
+	originChatID := task.OriginChatID
+	finalResult := task.Result
+
 	// Send announce message back to main agent
 	if sm.bus != nil {
-		announceContent := fmt.Sprintf("Task '%s' completed.\n\nResult:\n%s", task.Label, task.Result)
+		announceContent := fmt.Sprintf("Task '%s' completed.\n\nResult:\n%s", label, finalResult)
 		pubCtx, pubCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer pubCancel()
 		sm.bus.PublishInbound(pubCtx, bus.InboundMessage{
 			Channel:  "system",
 			SenderID: fmt.Sprintf("subagent:%s", task.ID),
 			// Format: "original_channel:original_chat_id" for routing back
-			ChatID:  fmt.Sprintf("%s:%s", task.OriginChannel, task.OriginChatID),
+			ChatID:  fmt.Sprintf("%s:%s", originChannel, originChatID),
 			Content: announceContent,
 		})
 	}

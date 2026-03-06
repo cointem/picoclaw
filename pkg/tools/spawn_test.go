@@ -77,3 +77,47 @@ func TestSpawnTool_Execute_NilManager(t *testing.T) {
 		t.Errorf("Error message should mention manager not configured, got: %s", result.ForLLM)
 	}
 }
+
+func TestSpawnTool_Execute_TargetAgent_UsesResolver(t *testing.T) {
+	provider := &MockLLMProvider{}
+	managerA := NewSubagentManager(provider, "test-model", "/tmp/test", nil)
+	managerB := NewSubagentManager(provider, "test-model", "/tmp/test", nil)
+	tool := NewSpawnTool(managerA)
+	tool.SetManagerResolver(func(targetAgentID string) (*SubagentManager, bool) {
+		if strings.TrimSpace(targetAgentID) == "other" {
+			return managerB, true
+		}
+		return nil, false
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // avoid running the LLM loop in background
+
+	result := tool.Execute(ctx, map[string]any{"task": "do it", "agent_id": "other"})
+	if result == nil || result.IsError {
+		t.Fatalf("Expected success, got: %+v", result)
+	}
+	if len(managerA.ListTasks()) != 0 {
+		t.Fatalf("Expected managerA to have 0 tasks, got %d", len(managerA.ListTasks()))
+	}
+	if len(managerB.ListTasks()) != 1 {
+		t.Fatalf("Expected managerB to have 1 task, got %d", len(managerB.ListTasks()))
+	}
+}
+
+func TestSpawnTool_Execute_TargetAgent_Unavailable(t *testing.T) {
+	provider := &MockLLMProvider{}
+	manager := NewSubagentManager(provider, "test-model", "/tmp/test", nil)
+	tool := NewSpawnTool(manager)
+	tool.SetManagerResolver(func(targetAgentID string) (*SubagentManager, bool) {
+		return nil, false
+	})
+
+	result := tool.Execute(context.Background(), map[string]any{"task": "do it", "agent_id": "missing"})
+	if result == nil || !result.IsError {
+		t.Fatalf("Expected error, got: %+v", result)
+	}
+	if !strings.Contains(result.ForLLM, "not available") {
+		t.Fatalf("Expected error to mention not available, got: %s", result.ForLLM)
+	}
+}

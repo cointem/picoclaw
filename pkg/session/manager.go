@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -98,6 +99,19 @@ func (sm *SessionManager) GetHistory(key string) []providers.Message {
 	history := make([]providers.Message, len(session.Messages))
 	copy(history, session.Messages)
 	return history
+}
+
+// ListKeys returns all known session keys in sorted order.
+func (sm *SessionManager) ListKeys() []string {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	keys := make([]string, 0, len(sm.sessions))
+	for key := range sm.sessions {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func (sm *SessionManager) GetSummary(key string) string {

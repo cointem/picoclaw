@@ -23,6 +23,7 @@ type toolCtxKey struct{ name string }
 var (
 	ctxKeyChannel = &toolCtxKey{"channel"}
 	ctxKeyChatID  = &toolCtxKey{"chatID"}
+	ctxKeySession = &toolCtxKey{"sessionKey"}
 )
 
 // WithToolContext returns a child context carrying channel and chatID.
@@ -30,6 +31,11 @@ func WithToolContext(ctx context.Context, channel, chatID string) context.Contex
 	ctx = context.WithValue(ctx, ctxKeyChannel, channel)
 	ctx = context.WithValue(ctx, ctxKeyChatID, chatID)
 	return ctx
+}
+
+// WithToolSessionKey returns a child context carrying sessionKey.
+func WithToolSessionKey(ctx context.Context, sessionKey string) context.Context {
+	return context.WithValue(ctx, ctxKeySession, sessionKey)
 }
 
 // ToolChannel extracts the channel from ctx, or "" if unset.
@@ -41,6 +47,12 @@ func ToolChannel(ctx context.Context) string {
 // ToolChatID extracts the chatID from ctx, or "" if unset.
 func ToolChatID(ctx context.Context) string {
 	v, _ := ctx.Value(ctxKeyChatID).(string)
+	return v
+}
+
+// ToolSessionKey extracts the session key from ctx, or "" if unset.
+func ToolSessionKey(ctx context.Context) string {
+	v, _ := ctx.Value(ctxKeySession).(string)
 	return v
 }
 

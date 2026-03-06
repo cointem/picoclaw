@@ -390,6 +390,28 @@ func TestShellTool_SafePathsInWorkspaceRestriction(t *testing.T) {
 	}
 }
 
+func TestShellTool_WorkspaceRestriction_AllowsHTTPURLs(t *testing.T) {
+	tmpDir := t.TempDir()
+	tool, err := NewExecTool(tmpDir, true)
+	if err != nil {
+		t.Fatalf("unable to configure exec tool: %s", err)
+	}
+
+	commands := []string{
+		`curl -s "https://wttr.in?format=3"`,
+		`curl -s "http://example.com"`,
+		`wget -qO- "https://example.com"`,
+	}
+
+	for _, cmd := range commands {
+		if guard := tool.guardCommand(cmd, tmpDir); guard != "" {
+			if strings.Contains(guard, "path outside working dir") {
+				t.Fatalf("URL should not be treated as filesystem path: %s\n  guard: %s", cmd, guard)
+			}
+		}
+	}
+}
+
 // TestShellTool_CustomAllowPatterns verifies that custom allow patterns exempt
 // commands from deny pattern checks.
 func TestShellTool_CustomAllowPatterns(t *testing.T) {

@@ -102,6 +102,9 @@ func registerSharedTools(
 	registry *AgentRegistry,
 	provider providers.LLMProvider,
 ) {
+	subagentManagers := make(map[string]*tools.SubagentManager)
+	sessionsTargets := make(map[string]tools.SessionsSpawnTarget)
+
 	for _, agentID := range registry.ListAgentIDs() {
 		agent, ok := registry.GetAgent(agentID)
 		if !ok {
@@ -199,15 +202,73 @@ func registerSharedTools(
 			if cfg.Tools.IsToolEnabled("subagent") {
 				subagentManager := tools.NewSubagentManager(provider, agent.Model, agent.Workspace, msgBus)
 				subagentManager.SetLLMOptions(agent.MaxTokens, agent.Temperature)
+
+				// Inject a filtered view of the current agent's tools for subagent execution.
+				// Explicitly exclude spawn to avoid recursive subagent spawning.
+				subagentManager.SetTools(agent.Tools.CloneExcept("spawn"))
+				subagentManagers[agentID] = subagentManager
+
 				spawnTool := tools.NewSpawnTool(subagentManager)
 				currentAgentID := agentID
 				spawnTool.SetAllowlistChecker(func(targetAgentID string) bool {
 					return registry.CanSpawnSubagent(currentAgentID, targetAgentID)
 				})
+				spawnTool.SetManagerResolver(func(targetAgentID string) (*tools.SubagentManager, bool) {
+					trimmed := strings.TrimSpace(targetAgentID)
+					if trimmed == "" {
+						return subagentManager, true
+					}
+					resolvedAgentID := routing.NormalizeAgentID(trimmed)
+					mgr, ok := subagentManagers[resolvedAgentID]
+					return mgr, ok
+				})
 				agent.Tools.Register(spawnTool)
 			} else {
 				logger.WarnCF("agent", "spawn tool requires subagent to be enabled", nil)
 			}
+		}
+
+		// sessions_* tools (session inspection & subagent session spawn)
+		agent.Tools.Register(tools.NewSessionsListTool(agent.Sessions))
+		agent.Tools.Register(tools.NewSessionsHistoryTool(agent.Sessions))
+		agent.Tools.Register(tools.NewSessionsSendTool(agent.Sessions))
+
+		if cfg.Tools.IsToolEnabled("subagent") {
+			// sessions_spawn: OpenClaw-style subagent sessions
+			llmOptions := map[string]any{}
+			if agent.MaxTokens > 0 {
+				llmOptions["max_tokens"] = agent.MaxTokens
+			}
+			llmOptions["temperature"] = agent.Temperature
+
+			defaultTarget := tools.SessionsSpawnTarget{
+				AgentID:       agent.ID,
+				Provider:      provider,
+				Model:         agent.Model,
+				Workspace:     agent.Workspace,
+				Sessions:      agent.Sessions,
+				Tools:         agent.Tools,
+				MaxIterations: agent.MaxIterations,
+				LLMOptions:    llmOptions,
+				Bus:           msgBus,
+			}
+			sessionsTargets[agentID] = defaultTarget
+
+			sessionsSpawn := tools.NewSessionsSpawnTool(defaultTarget)
+			currentAgentID := agentID
+			sessionsSpawn.SetAllowlistChecker(func(targetAgentID string) bool {
+				return registry.CanSpawnSubagent(currentAgentID, targetAgentID)
+			})
+			sessionsSpawn.SetTargetResolver(func(targetAgentID string) (tools.SessionsSpawnTarget, bool) {
+				trimmed := strings.TrimSpace(targetAgentID)
+				if trimmed == "" {
+					return defaultTarget, true
+				}
+				resolvedAgentID := routing.NormalizeAgentID(trimmed)
+				target, ok := sessionsTargets[resolvedAgentID]
+				return target, ok
+			})
+			agent.Tools.Register(sessionsSpawn)
 		}
 	}
 }
@@ -933,7 +994,13 @@ func (al *AgentLoop) runLLMIteration(
 				strings.Contains(errMsg, "deadline exceeded") ||
 				strings.Contains(errMsg, "client.timeout") ||
 				strings.Contains(errMsg, "timed out") ||
-				strings.Contains(errMsg, "timeout exceeded")
+				strings.Contains(errMsg, "timeout exceeded") ||
+				// Treat common transient network failures as retryable.
+				strings.Contains(errMsg, "unexpected eof") ||
+				strings.Contains(errMsg, "connection reset by peer") ||
+				strings.Contains(errMsg, "broken pipe") ||
+				strings.Contains(errMsg, "server closed") ||
+				strings.Contains(errMsg, "connection refused")
 
 			// Detect real context window / token limit errors, excluding network timeouts.
 			isContextError := !isTimeoutError && (strings.Contains(errMsg, "context_length_exceeded") ||
@@ -1115,7 +1182,7 @@ func (al *AgentLoop) runLLMIteration(
 				}
 
 				toolResult := agent.Tools.ExecuteWithContext(
-					ctx,
+					tools.WithToolSessionKey(ctx, opts.SessionKey),
 					tc.Name,
 					tc.Arguments,
 					opts.Channel,

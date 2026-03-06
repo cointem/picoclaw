@@ -47,9 +47,35 @@ func TestWebTool_WebFetch_Success(t *testing.T) {
 		t.Errorf("Expected ForLLM to contain 'Test Page', got: %s", result.ForLLM)
 	}
 
-	// ForUser should contain summary
+	// ForUser should contain summary for non-chat callers
 	if !strings.Contains(result.ForUser, "bytes") && !strings.Contains(result.ForUser, "extractor") {
 		t.Errorf("Expected ForUser to contain summary, got: %s", result.ForUser)
+	}
+}
+
+func TestWebTool_WebFetch_SilentInChat(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	tool, err := NewWebFetchTool(50000, testFetchLimit)
+	if err != nil {
+		t.Fatalf("Failed to create web fetch tool: %v", err)
+	}
+
+	ctx := WithToolContext(context.Background(), "telegram", "chat-1")
+	result := tool.Execute(ctx, map[string]any{"url": server.URL})
+	if result == nil || result.IsError {
+		t.Fatalf("Expected success, got: %+v", result)
+	}
+	if !result.Silent {
+		t.Fatalf("Expected result to be silent in chat, got Silent=false")
+	}
+	if strings.TrimSpace(result.ForUser) != "" {
+		t.Fatalf("Expected empty ForUser in chat, got: %q", result.ForUser)
 	}
 }
 
