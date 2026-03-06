@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/sipeed/picoclaw/pkg/config"
+	"github.com/sipeed/picoclaw/pkg/memoryplugins"
 	"github.com/sipeed/picoclaw/pkg/providers"
 	"github.com/sipeed/picoclaw/pkg/routing"
 	"github.com/sipeed/picoclaw/pkg/session"
@@ -34,6 +36,7 @@ type AgentInstance struct {
 	Sessions                  *session.SessionManager
 	ContextBuilder            *ContextBuilder
 	Tools                     *tools.ToolRegistry
+	MemoryPlugins             *memoryplugins.Manager
 	Subagents                 *config.SubagentsConfig
 	SkillsFilter              []string
 	Candidates                []providers.FallbackCandidate
@@ -88,7 +91,23 @@ func NewAgentInstance(
 	sessionsDir := filepath.Join(workspace, "sessions")
 	sessionsManager := session.NewSessionManager(sessionsDir)
 
-	contextBuilder := NewContextBuilder(workspace)
+	// Prefer plugin-based memory when enabled (e.g., mem0). Keep legacy file-based
+	// MEMORY.md only when memory-md plugin is enabled.
+	enableFileMemory := true
+	if cfg != nil && cfg.Memory.Enabled {
+		enableFileMemory = false
+		for _, spec := range cfg.Memory.Plugins {
+			enabled := true
+			if spec.Enabled != nil {
+				enabled = *spec.Enabled
+			}
+			if enabled && spec.ID == "memory-md" {
+				enableFileMemory = true
+				break
+			}
+		}
+	}
+	contextBuilder := NewContextBuilderWithOptions(workspace, ContextBuilderOptions{EnableFileMemory: enableFileMemory})
 
 	agentID := routing.DefaultAgentID
 	agentName := ""
@@ -100,6 +119,18 @@ func NewAgentInstance(
 		agentName = agentCfg.Name
 		subagents = agentCfg.Subagents
 		skillsFilter = agentCfg.Skills
+	}
+
+	// Memory plugins (tools + prompt hooks)
+	memMgr := memoryplugins.NewManager(memoryplugins.Options{
+		Workspace: workspace,
+		AgentID:   agentID,
+		Tools:     toolsRegistry,
+	})
+	if cfg != nil {
+		if err := memMgr.LoadFromConfig(context.Background(), cfg.Memory); err != nil {
+			log.Printf("Warning: failed to load memory plugins for agent %s: %v", agentID, err)
+		}
 	}
 
 	maxIter := defaults.MaxToolIterations
@@ -197,6 +228,7 @@ func NewAgentInstance(
 		Sessions:                  sessionsManager,
 		ContextBuilder:            contextBuilder,
 		Tools:                     toolsRegistry,
+		MemoryPlugins:             memMgr,
 		Subagents:                 subagents,
 		SkillsFilter:              skillsFilter,
 		Candidates:                candidates,

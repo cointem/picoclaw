@@ -24,6 +24,7 @@ import (
 	"github.com/sipeed/picoclaw/pkg/config"
 	"github.com/sipeed/picoclaw/pkg/constants"
 	"github.com/sipeed/picoclaw/pkg/logger"
+	"github.com/sipeed/picoclaw/pkg/memoryplugins"
 	"github.com/sipeed/picoclaw/pkg/mcp"
 	"github.com/sipeed/picoclaw/pkg/media"
 	"github.com/sipeed/picoclaw/pkg/providers"
@@ -697,6 +698,17 @@ func (al *AgentLoop) runAgentLoop(
 		history = agent.Sessions.GetHistory(opts.SessionKey)
 		summary = agent.Sessions.GetSummary(opts.SessionKey)
 	}
+
+	// Optional dynamic memory appendix (from configured memory plugins)
+	systemAppendix := ""
+	if agent.MemoryPlugins != nil {
+		systemAppendix = agent.MemoryPlugins.BuildSystemAppendix(ctx, memoryplugins.SystemAppendixInput{
+			SessionKey:  opts.SessionKey,
+			Channel:     opts.Channel,
+			ChatID:      opts.ChatID,
+			UserMessage: opts.UserMessage,
+		})
+	}
 	messages := agent.ContextBuilder.BuildMessages(
 		history,
 		summary,
@@ -704,6 +716,7 @@ func (al *AgentLoop) runAgentLoop(
 		opts.Media,
 		opts.Channel,
 		opts.ChatID,
+		systemAppendix,
 	)
 
 	// Resolve media:// refs to base64 data URLs (streaming)
@@ -714,7 +727,7 @@ func (al *AgentLoop) runAgentLoop(
 	agent.Sessions.AddMessage(opts.SessionKey, "user", opts.UserMessage)
 
 	// 3. Run LLM iteration loop
-	finalContent, iteration, err := al.runLLMIteration(ctx, agent, messages, opts)
+	finalContent, iteration, err := al.runLLMIteration(ctx, agent, messages, opts, systemAppendix)
 	if err != nil {
 		return "", err
 	}
@@ -820,6 +833,7 @@ func (al *AgentLoop) runLLMIteration(
 	agent *AgentInstance,
 	messages []providers.Message,
 	opts processOptions,
+	systemAppendix string,
 ) (string, int, error) {
 	iteration := 0
 	var finalContent string
@@ -966,6 +980,7 @@ func (al *AgentLoop) runLLMIteration(
 				messages = agent.ContextBuilder.BuildMessages(
 					newHistory, newSummary, "",
 					nil, opts.Channel, opts.ChatID,
+					systemAppendix,
 				)
 				continue
 			}

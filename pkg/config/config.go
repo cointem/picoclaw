@@ -51,6 +51,7 @@ type Config struct {
 	Agents    AgentsConfig    `json:"agents"`
 	Bindings  []AgentBinding  `json:"bindings,omitempty"`
 	Session   SessionConfig   `json:"session,omitempty"`
+	Memory    MemoryConfig    `json:"memory,omitempty"`
 	Channels  ChannelsConfig  `json:"channels"`
 	Providers ProvidersConfig `json:"providers,omitempty"`
 	ModelList []ModelConfig   `json:"model_list"` // New model-centric provider configuration
@@ -58,6 +59,19 @@ type Config struct {
 	Tools     ToolsConfig     `json:"tools"`
 	Heartbeat HeartbeatConfig `json:"heartbeat"`
 	Devices   DevicesConfig   `json:"devices"`
+}
+
+// MemoryConfig enables optional memory plugins (tools + prompt hooks).
+// This is inspired by openclaw's memory extension mechanism.
+type MemoryConfig struct {
+	Enabled bool               `json:"enabled" env:"PICOCLAW_MEMORY_ENABLED"`
+	Plugins []MemoryPluginSpec `json:"plugins,omitempty"`
+}
+
+type MemoryPluginSpec struct {
+	ID      string          `json:"id"`
+	Enabled *bool           `json:"enabled,omitempty"`
+	Config  json.RawMessage `json:"config,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Config

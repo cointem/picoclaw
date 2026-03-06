@@ -11,6 +11,36 @@
       "summarize_token_percent": 75
     }
   },
+  "memory": {
+    "enabled": false,
+    "plugins": [
+      {
+        "id": "memory-md",
+        "config": {
+          "auto_recall": true,
+          "recall_days": 7,
+          "recall_max_results": 5,
+          "recall_max_chars": 240
+        }
+      },
+      {
+        "id": "memory-mem0",
+        "enabled": false,
+        "config": {
+          "api_key_env": "MEM0_API_KEY",
+          "base_url": "https://api.mem0.ai",
+          "org_id": "",
+          "project_id": "",
+          "version": "v2",
+          "auto_recall": true,
+          "recall_top_k": 5,
+          "recall_threshold": 0.3,
+          "recall_max_chars": 240,
+          "user_id_mode": "session_key"
+        }
+      }
+    ]
+  },
   "model_list": [
     {
       "model_name": "gpt4",
