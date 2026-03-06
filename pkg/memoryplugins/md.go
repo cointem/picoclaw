@@ -136,9 +136,9 @@ func (p *mdPlugin) BuildSystemAppendix(ctx context.Context, in SystemAppendixInp
 }
 
 type mdMatch struct {
-	Source string
-	Score  int
-	At     time.Time
+	Source  string
+	Score   int
+	At      time.Time
 	Snippet string
 }
 

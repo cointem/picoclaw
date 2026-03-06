@@ -39,10 +39,10 @@ type CloseHook interface {
 }
 
 type API struct {
-	Workspace   string
-	AgentID     string
-	Tools       *tools.ToolRegistry
-	PluginID    string
+	Workspace    string
+	AgentID      string
+	Tools        *tools.ToolRegistry
+	PluginID     string
 	PluginConfig json.RawMessage
 }
 

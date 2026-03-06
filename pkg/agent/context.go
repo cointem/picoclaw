@@ -18,9 +18,9 @@ import (
 )
 
 type ContextBuilder struct {
-	workspace    string
-	skillsLoader *skills.SkillsLoader
-	memory       *MemoryStore
+	workspace        string
+	skillsLoader     *skills.SkillsLoader
+	memory           *MemoryStore
 	enableFileMemory bool
 
 	// Cache for system prompt to avoid rebuilding on every call.
@@ -78,9 +78,9 @@ func NewContextBuilderWithOptions(workspace string, opts ContextBuilderOptions) 
 	}
 
 	return &ContextBuilder{
-		workspace:    workspace,
-		skillsLoader: skills.NewSkillsLoader(workspace, globalSkillsDir, builtinSkillsDir),
-		memory:       memStore,
+		workspace:        workspace,
+		skillsLoader:     skills.NewSkillsLoader(workspace, globalSkillsDir, builtinSkillsDir),
+		memory:           memStore,
 		enableFileMemory: enableFileMemory,
 	}
 }

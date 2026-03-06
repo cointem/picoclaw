@@ -114,16 +114,16 @@ type mem0SearchRequest struct {
 }
 
 type mem0Memory struct {
-	ID            string         `json:"id"`
-	Memory        string         `json:"memory"`
-	UserID        string         `json:"user_id"`
-	Categories    []string       `json:"categories,omitempty"`
-	Metadata      map[string]any `json:"metadata,omitempty"`
-	CreatedAt     string         `json:"created_at,omitempty"`
-	UpdatedAt     string         `json:"updated_at,omitempty"`
-	Immutable     bool           `json:"immutable,omitempty"`
-	ExpirationDate any           `json:"expiration_date,omitempty"`
-	Score         *float64       `json:"score,omitempty"`
+	ID             string         `json:"id"`
+	Memory         string         `json:"memory"`
+	UserID         string         `json:"user_id"`
+	Categories     []string       `json:"categories,omitempty"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
+	CreatedAt      string         `json:"created_at,omitempty"`
+	UpdatedAt      string         `json:"updated_at,omitempty"`
+	Immutable      bool           `json:"immutable,omitempty"`
+	ExpirationDate any            `json:"expiration_date,omitempty"`
+	Score          *float64       `json:"score,omitempty"`
 }
 
 func (c *mem0Client) Add(ctx context.Context, req mem0AddRequest) ([]mem0AddEvent, error) {

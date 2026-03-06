@@ -46,11 +46,11 @@ func TestMemoryMem0Plugin_LoadAndToolsAndAppendix(t *testing.T) {
 	mgr := NewManager(Options{Workspace: t.TempDir(), AgentID: "main", Tools: reg})
 
 	pluginCfg, _ := json.Marshal(map[string]any{
-		"api_key":        "test-key",
-		"base_url":       srv.URL,
-		"auto_recall":    true,
-		"recall_top_k":   3,
-		"user_id_mode":   "session_key",
+		"api_key":          "test-key",
+		"base_url":         srv.URL,
+		"auto_recall":      true,
+		"recall_top_k":     3,
+		"user_id_mode":     "session_key",
 		"recall_max_chars": 50,
 	})
 

@@ -28,23 +28,23 @@ func (t *memorySearchTool) Description() string {
 
 func (t *memorySearchTool) Parameters() map[string]any {
 	return map[string]any{
-		"type": "object",
+		"type":                 "object",
 		"additionalProperties": false,
 		"properties": map[string]any{
 			"query": map[string]any{
-				"type": "string",
+				"type":        "string",
 				"description": "检索关键词/短语",
 			},
 			"days": map[string]any{
-				"type": "integer",
+				"type":        "integer",
 				"description": "检索最近多少天的 daily notes（默认 7）",
 			},
 			"max_results": map[string]any{
-				"type": "integer",
+				"type":        "integer",
 				"description": "返回最多多少条结果（默认 5）",
 			},
 			"max_chars": map[string]any{
-				"type": "integer",
+				"type":        "integer",
 				"description": "每条片段最大字符数（默认 240）",
 			},
 		},
@@ -94,20 +94,20 @@ func (t *memoryGetTool) Description() string {
 
 func (t *memoryGetTool) Parameters() map[string]any {
 	return map[string]any{
-		"type": "object",
+		"type":                 "object",
 		"additionalProperties": false,
 		"properties": map[string]any{
 			"scope": map[string]any{
-				"type": "string",
+				"type":        "string",
 				"description": "读取范围：all / long_term / daily_notes",
-				"enum": []string{"all", "long_term", "daily_notes"},
+				"enum":        []string{"all", "long_term", "daily_notes"},
 			},
 			"days": map[string]any{
-				"type": "integer",
+				"type":        "integer",
 				"description": "读取最近多少天的 daily notes（默认 3）",
 			},
 			"max_chars": map[string]any{
-				"type": "integer",
+				"type":        "integer",
 				"description": "最多返回字符数（默认 8000，超出会截断）",
 			},
 		},
@@ -187,17 +187,17 @@ func (t *memoryStoreTool) Description() string {
 
 func (t *memoryStoreTool) Parameters() map[string]any {
 	return map[string]any{
-		"type": "object",
+		"type":                 "object",
 		"additionalProperties": false,
 		"properties": map[string]any{
 			"content": map[string]any{
-				"type": "string",
+				"type":        "string",
 				"description": "要保存的内容",
 			},
 			"scope": map[string]any{
-				"type": "string",
+				"type":        "string",
 				"description": "保存到 long_term 或 today（默认 long_term）",
-				"enum": []string{"long_term", "today"},
+				"enum":        []string{"long_term", "today"},
 			},
 		},
 		"required": []string{"content"},

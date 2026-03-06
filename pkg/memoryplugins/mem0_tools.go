@@ -9,10 +9,12 @@ import (
 	"github.com/sipeed/picoclaw/pkg/tools"
 )
 
-type mem0MemorySearchTool struct{ p *mem0Plugin }
-type mem0MemoryStoreTool struct{ p *mem0Plugin }
-type mem0MemoryGetTool struct{ p *mem0Plugin }
-type mem0MemoryForgetTool struct{ p *mem0Plugin }
+type (
+	mem0MemorySearchTool struct{ p *mem0Plugin }
+	mem0MemoryStoreTool  struct{ p *mem0Plugin }
+	mem0MemoryGetTool    struct{ p *mem0Plugin }
+	mem0MemoryForgetTool struct{ p *mem0Plugin }
+)
 
 func newMem0MemorySearchTool(p *mem0Plugin) tools.Tool { return &mem0MemorySearchTool{p: p} }
 func newMem0MemoryStoreTool(p *mem0Plugin) tools.Tool  { return &mem0MemoryStoreTool{p: p} }
