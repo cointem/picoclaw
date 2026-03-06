@@ -880,6 +880,7 @@ func (al *AgentLoop) runLLMIteration(
 			"max_tokens":       agent.MaxTokens,
 			"temperature":      agent.Temperature,
 			"prompt_cache_key": agent.ID,
+			"session_key":      opts.SessionKey,
 		}
 		// parseThinkingLevel guarantees ThinkingOff for empty/unknown values,
 		// so checking != ThinkingOff is sufficient.

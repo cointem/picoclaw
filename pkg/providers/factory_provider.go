@@ -12,6 +12,28 @@ import (
 	"github.com/sipeed/picoclaw/pkg/config"
 )
 
+func resolveAPIKeys(cfg *config.ModelConfig) []string {
+	seen := make(map[string]bool)
+	var out []string
+	add := func(k string) {
+		k = strings.TrimSpace(k)
+		if k == "" {
+			return
+		}
+		if seen[k] {
+			return
+		}
+		seen[k] = true
+		out = append(out, k)
+	}
+
+	add(cfg.APIKey)
+	for _, k := range cfg.APIKeys {
+		add(k)
+	}
+	return out
+}
+
 // createClaudeAuthProvider creates a Claude provider using OAuth credentials from auth store.
 func createClaudeAuthProvider() (LLMProvider, error) {
 	cred, err := getCredential("anthropic")
@@ -77,15 +99,38 @@ func CreateProviderFromConfig(cfg *config.ModelConfig) (LLMProvider, string, err
 			return provider, modelID, nil
 		}
 		// OpenAI with API key
-		if cfg.APIKey == "" && cfg.APIBase == "" {
+		keys := resolveAPIKeys(cfg)
+		if len(keys) == 0 && cfg.APIBase == "" {
 			return nil, "", fmt.Errorf("api_key or api_base is required for HTTP-based protocol %q", protocol)
 		}
 		apiBase := cfg.APIBase
 		if apiBase == "" {
 			apiBase = getDefaultAPIBase(protocol)
 		}
+		if len(keys) > 1 {
+			store, err := NewAuthProfilesStore(cfg.Workspace)
+			if err != nil {
+				return nil, "", err
+			}
+			profiles := make([]ProfileClient, 0, len(keys))
+			for i, key := range keys {
+				profiles = append(profiles, ProfileClient{
+					Name:     fmt.Sprintf("key-%d", i+1),
+					Provider: NewHTTPProviderWithMaxTokensFieldAndRequestTimeout(key, apiBase, cfg.Proxy, cfg.MaxTokensField, cfg.RequestTimeout),
+				})
+			}
+			pp, err := NewProfiledProvider(protocol, apiBase, store, profiles)
+			if err != nil {
+				return nil, "", err
+			}
+			return pp, modelID, nil
+		}
+		key := ""
+		if len(keys) == 1 {
+			key = keys[0]
+		}
 		return NewHTTPProviderWithMaxTokensFieldAndRequestTimeout(
-			cfg.APIKey,
+			key,
 			apiBase,
 			cfg.Proxy,
 			cfg.MaxTokensField,
@@ -96,15 +141,38 @@ func CreateProviderFromConfig(cfg *config.ModelConfig) (LLMProvider, string, err
 		"ollama", "moonshot", "shengsuanyun", "deepseek", "cerebras",
 		"volcengine", "vllm", "qwen", "mistral", "avian":
 		// All other OpenAI-compatible HTTP providers
-		if cfg.APIKey == "" && cfg.APIBase == "" {
+		keys := resolveAPIKeys(cfg)
+		if len(keys) == 0 && cfg.APIBase == "" {
 			return nil, "", fmt.Errorf("api_key or api_base is required for HTTP-based protocol %q", protocol)
 		}
 		apiBase := cfg.APIBase
 		if apiBase == "" {
 			apiBase = getDefaultAPIBase(protocol)
 		}
+		if len(keys) > 1 {
+			store, err := NewAuthProfilesStore(cfg.Workspace)
+			if err != nil {
+				return nil, "", err
+			}
+			profiles := make([]ProfileClient, 0, len(keys))
+			for i, key := range keys {
+				profiles = append(profiles, ProfileClient{
+					Name:     fmt.Sprintf("key-%d", i+1),
+					Provider: NewHTTPProviderWithMaxTokensFieldAndRequestTimeout(key, apiBase, cfg.Proxy, cfg.MaxTokensField, cfg.RequestTimeout),
+				})
+			}
+			pp, err := NewProfiledProvider(protocol, apiBase, store, profiles)
+			if err != nil {
+				return nil, "", err
+			}
+			return pp, modelID, nil
+		}
+		key := ""
+		if len(keys) == 1 {
+			key = keys[0]
+		}
 		return NewHTTPProviderWithMaxTokensFieldAndRequestTimeout(
-			cfg.APIKey,
+			key,
 			apiBase,
 			cfg.Proxy,
 			cfg.MaxTokensField,
@@ -125,11 +193,30 @@ func CreateProviderFromConfig(cfg *config.ModelConfig) (LLMProvider, string, err
 		if apiBase == "" {
 			apiBase = "https://api.anthropic.com/v1"
 		}
-		if cfg.APIKey == "" {
+		keys := resolveAPIKeys(cfg)
+		if len(keys) == 0 {
 			return nil, "", fmt.Errorf("api_key is required for anthropic protocol (model: %s)", cfg.Model)
 		}
+		if len(keys) > 1 {
+			store, err := NewAuthProfilesStore(cfg.Workspace)
+			if err != nil {
+				return nil, "", err
+			}
+			profiles := make([]ProfileClient, 0, len(keys))
+			for i, key := range keys {
+				profiles = append(profiles, ProfileClient{
+					Name:     fmt.Sprintf("key-%d", i+1),
+					Provider: NewHTTPProviderWithMaxTokensFieldAndRequestTimeout(key, apiBase, cfg.Proxy, cfg.MaxTokensField, cfg.RequestTimeout),
+				})
+			}
+			pp, err := NewProfiledProvider(protocol, apiBase, store, profiles)
+			if err != nil {
+				return nil, "", err
+			}
+			return pp, modelID, nil
+		}
 		return NewHTTPProviderWithMaxTokensFieldAndRequestTimeout(
-			cfg.APIKey,
+			keys[0],
 			apiBase,
 			cfg.Proxy,
 			cfg.MaxTokensField,

@@ -547,6 +547,21 @@ Agent 读取 HEARTBEAT.md
 }
 ```
 
+**OpenAI（多 Key 轮换 / Auth Profiles）**
+
+当同一个模型需要配置多个 API Key 时，可以使用 `api_keys`。PicoClaw 会在**同一模型内**先轮换可用的 key（并对单个 key 做冷却/计费禁用持久化），全部不可用时才进入下一层的模型回退（Fallback）。
+
+```json
+{
+  "model_name": "gpt-5.2",
+  "model": "openai/gpt-5.2",
+  "api_keys": [
+    "sk-key-1",
+    "sk-key-2"
+  ]
+}
+```
+
 **智谱 AI (GLM)**
 
 ```json

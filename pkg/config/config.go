@@ -508,9 +508,10 @@ type ModelConfig struct {
 	Model     string `json:"model"`      // Protocol/model-identifier (e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4.6")
 
 	// HTTP-based providers
-	APIBase string `json:"api_base,omitempty"` // API endpoint URL
-	APIKey  string `json:"api_key"`            // API authentication key
-	Proxy   string `json:"proxy,omitempty"`    // HTTP proxy URL
+	APIBase string   `json:"api_base,omitempty"` // API endpoint URL
+	APIKey  string   `json:"api_key,omitempty"`  // API authentication key (single key)
+	APIKeys []string `json:"api_keys,omitempty"` // Optional: multiple API keys (auth profiles) rotated before model fallback
+	Proxy   string   `json:"proxy,omitempty"`    // HTTP proxy URL
 
 	// Special providers (CLI-based, OAuth, etc.)
 	AuthMethod  string `json:"auth_method,omitempty"`  // Authentication method: oauth, token
@@ -532,6 +533,7 @@ func (c *ModelConfig) Validate() error {
 	if c.Model == "" {
 		return fmt.Errorf("model is required")
 	}
+	// api_key can be omitted when api_keys is provided or when using oauth/token.
 	return nil
 }
 

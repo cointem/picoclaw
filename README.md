@@ -1015,6 +1015,21 @@ This design also enables **multi-agent support** with flexible provider selectio
 }
 ```
 
+**OpenAI (Multiple Keys / Auth Profiles)**
+
+When you have multiple API keys for the same model, you can use `api_keys`. PicoClaw will rotate available keys **within the same model** (with per-key cooldown/billing-disable persistence) before falling back to the next model.
+
+```json
+{
+  "model_name": "gpt-5.2",
+  "model": "openai/gpt-5.2",
+  "api_keys": [
+    "sk-key-1",
+    "sk-key-2"
+  ]
+}
+```
+
 **智谱 AI (GLM)**
 
 ```json
