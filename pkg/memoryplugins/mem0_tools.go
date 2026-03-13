@@ -24,7 +24,7 @@ func newMem0MemoryForgetTool(p *mem0Plugin) tools.Tool { return &mem0MemoryForge
 func (t *mem0MemorySearchTool) Name() string { return "memory_search" }
 
 func (t *mem0MemorySearchTool) Description() string {
-	return "在 Mem0 记忆中按语义检索相关内容（建议提供 user_id 进行隔离）。"
+	return "在 Mem0 记忆中按语义检索相关内容。若未提供 user_id，会按配置从当前上下文自动推导。"
 }
 
 func (t *mem0MemorySearchTool) Parameters() map[string]any {
@@ -38,7 +38,7 @@ func (t *mem0MemorySearchTool) Parameters() map[string]any {
 			},
 			"user_id": map[string]any{
 				"type":        "string",
-				"description": "可选：用户标识；不填则使用当前会话的 session_key",
+				"description": "可选：用户标识；不填则按 user_id_mode 自动推导（session_key/chat_id）",
 			},
 			"top_k": map[string]any{
 				"type":        "integer",
@@ -66,6 +66,13 @@ func (t *mem0MemorySearchTool) Execute(ctx context.Context, args map[string]any)
 
 	userID, _ := args["user_id"].(string)
 	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		userID = t.p.deriveUserID(SystemAppendixInput{
+			SessionKey: tools.ToolSessionKey(ctx),
+			Channel:    tools.ToolChannel(ctx),
+			ChatID:     tools.ToolChatID(ctx),
+		}, "")
+	}
 
 	filters, ok := args["filters"].(map[string]any)
 	if !ok || filters == nil {
@@ -75,7 +82,7 @@ func (t *mem0MemorySearchTool) Execute(ctx context.Context, args map[string]any)
 		filters["user_id"] = userID
 	}
 	if _, exists := filters["user_id"]; !exists {
-		return tools.ErrorResult("missing user_id (pass user_id or filters.user_id)")
+		return tools.ErrorResult("missing user_id (pass user_id or provide session/chat context)")
 	}
 
 	topK := intFromAny(args["top_k"], 10)
@@ -120,7 +127,7 @@ func (t *mem0MemorySearchTool) Execute(ctx context.Context, args map[string]any)
 func (t *mem0MemoryStoreTool) Name() string { return "memory_store" }
 
 func (t *mem0MemoryStoreTool) Description() string {
-	return "将一条可长期记住的信息写入 Mem0（建议提供 user_id 进行隔离）。"
+	return "将一条可长期记住的稳定事实写入 Mem0（如偏好、约束、身份信息），避免存一次性命令。未提供 user_id 时会自动推导。"
 }
 
 func (t *mem0MemoryStoreTool) Parameters() map[string]any {
@@ -130,11 +137,11 @@ func (t *mem0MemoryStoreTool) Parameters() map[string]any {
 		"properties": map[string]any{
 			"content": map[string]any{
 				"type":        "string",
-				"description": "要保存的内容",
+				"description": "要保存的长期稳定事实（避免一次性命令）",
 			},
 			"user_id": map[string]any{
 				"type":        "string",
-				"description": "可选：用户标识；不填则不写 user_id（不推荐）",
+				"description": "可选：用户标识；不填则按 user_id_mode 自动推导（session_key/chat_id）",
 			},
 			"metadata": map[string]any{
 				"type":        "object",
@@ -163,7 +170,14 @@ func (t *mem0MemoryStoreTool) Execute(ctx context.Context, args map[string]any) 
 	userID, _ := args["user_id"].(string)
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
-		return tools.ErrorResult("missing user_id")
+		userID = t.p.deriveUserID(SystemAppendixInput{
+			SessionKey: tools.ToolSessionKey(ctx),
+			Channel:    tools.ToolChannel(ctx),
+			ChatID:     tools.ToolChatID(ctx),
+		}, "")
+	}
+	if userID == "" {
+		return tools.ErrorResult("missing user_id (pass user_id or provide session/chat context)")
 	}
 
 	metadata, _ := args["metadata"].(map[string]any)

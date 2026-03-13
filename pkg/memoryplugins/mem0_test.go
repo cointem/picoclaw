@@ -99,3 +99,70 @@ func TestMemoryMem0Plugin_LoadAndToolsAndAppendix(t *testing.T) {
 		t.Fatalf("expected add body to include messages, got: %s", gotAddBody)
 	}
 }
+
+func TestMemoryMem0Plugin_ToolsDeriveUserIDFromContext(t *testing.T) {
+	ctx := context.Background()
+
+	var gotSearchBody string
+	var gotAddBody string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/memories/search" {
+			b, _ := io.ReadAll(r.Body)
+			gotSearchBody = string(b)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			_, _ = w.Write([]byte(`{"results":[]}`))
+			return
+		}
+		if r.URL.Path == "/v1/memories/" {
+			b, _ := io.ReadAll(r.Body)
+			gotAddBody = string(b)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			_, _ = w.Write([]byte(`[{"id":"mem_2","event":"ADD","data":{"memory":"prefers concise responses"}}]`))
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	reg := tools.NewToolRegistry()
+	mgr := NewManager(Options{Workspace: t.TempDir(), AgentID: "main", Tools: reg})
+
+	pluginCfg, _ := json.Marshal(map[string]any{
+		"api_key":      "test-key",
+		"base_url":     srv.URL,
+		"user_id_mode": "session_key",
+	})
+
+	err := mgr.LoadFromConfig(ctx, config.MemoryConfig{
+		Enabled: true,
+		Plugins: []config.MemoryPluginSpec{{
+			ID:     "memory-mem0",
+			Config: pluginCfg,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadFromConfig: %v", err)
+	}
+
+	toolCtx := tools.WithToolContext(context.Background(), "telegram", "chat-42")
+	toolCtx = tools.WithToolSessionKey(toolCtx, "agent:main:telegram:direct:user-123")
+
+	storeRes := reg.Execute(toolCtx, "memory_store", map[string]any{"content": "用户偏好简洁回复"})
+	if storeRes == nil || storeRes.IsError || storeRes.Err != nil {
+		t.Fatalf("memory_store error: %+v", storeRes)
+	}
+	if !strings.Contains(gotAddBody, `"user_id":"agent:main:telegram:direct:user-123"`) {
+		t.Fatalf("expected add body to include derived session user_id, got: %s", gotAddBody)
+	}
+
+	searchRes := reg.Execute(toolCtx, "memory_search", map[string]any{"query": "偏好"})
+	if searchRes == nil || searchRes.IsError || searchRes.Err != nil {
+		t.Fatalf("memory_search error: %+v", searchRes)
+	}
+	if !strings.Contains(gotSearchBody, `"user_id":"agent:main:telegram:direct:user-123"`) {
+		t.Fatalf("expected search body to include derived session user_id, got: %s", gotSearchBody)
+	}
+}
